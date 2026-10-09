@@ -27,9 +27,11 @@
 
 .sidebar-header {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  justify-content: space-between; 
+  align-items: center;     
+  width: 100%;             
+  box-sizing: border-box;
+  padding: 0 16px;                
 }
 
 .sidebar-header h2 {
@@ -46,6 +48,12 @@
   background: #f9fafb;
   color: #374151;
   cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  padding: 0;             
 }
 
 .upload-box,
@@ -163,7 +171,8 @@
 
 .messages-area {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; 
+  padding-bottom: 24px;
 }
 
 .messages-content {
@@ -312,6 +321,13 @@
   border-top: 1px solid #e5e7eb;
   background: rgba(255, 255, 255, 0.95);
   padding: 16px 24px;
+
+  position: sticky;   /* 或者使用 absolute，取决于你父级容器的控制 */
+  bottom: 0;          /* 固定在底部 */
+  left: 0;
+  width: 100%;        /* 宽度撑满父级聊天区域 */
+  box-sizing: border-box; /* 确保 padding 不会撑破宽度 */
+  z-index: 10; 
 }
 
 .chat-form {

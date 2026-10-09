@@ -190,7 +190,7 @@ function App() {
             onClick={() => setSidebarCollapsed((value) => !value)}
             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            {sidebarCollapsed ? '→' : '←'}
+            {sidebarCollapsed ? '▷' : '▼'}
           </button>
         </div>
 
