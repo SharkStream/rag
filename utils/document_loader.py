@@ -82,3 +82,50 @@ def index_text_to_qdrant(
 
     qdrant_service.upsert_documents(documents)
     return len(documents)
+
+
+def get_supported_files(directory_path: str | Path) -> list[Path]:
+    """Return supported document files within a directory tree."""
+    root = Path(directory_path)
+    if not root.exists() or not root.is_dir():
+        raise FileNotFoundError(f"Directory does not exist: {directory_path}")
+
+    supported_exts = {".txt", ".md", ".csv", ".json", ".log", ".pdf"}
+    files = [path for path in root.rglob("*") if path.is_file() and path.suffix.lower() in supported_exts]
+    return sorted(files, key=lambda item: str(item).lower())
+
+
+def index_directory_to_qdrant(directory_path: str | Path, llm_service, qdrant_service) -> dict[str, Any]:
+    """Index all supported files in a directory tree into Qdrant."""
+    files = get_supported_files(directory_path)
+    if not files:
+        raise ValueError(f"No supported files were found in: {directory_path}")
+
+    indexed_files: list[str] = []
+    total_chunks = 0
+
+    for file_path in files:
+        with file_path.open("rb") as file_obj:
+            text = extract_text_from_file(file_obj, str(file_path.name))
+        if not text.strip():
+            continue
+
+        relative_name = str(file_path.relative_to(file_path.parents[0])) if file_path.parents else file_path.name
+        source_name = str(file_path)
+        chunk_count = index_text_to_qdrant(
+            text=text,
+            source_name=source_name,
+            llm_service=llm_service,
+            qdrant_service=qdrant_service,
+        )
+        if chunk_count > 0:
+            indexed_files.append(source_name)
+            total_chunks += chunk_count
+
+    if not indexed_files:
+        raise ValueError(f"No readable content was found in the directory: {directory_path}")
+
+    return {
+        "files": indexed_files,
+        "chunks": total_chunks,
+    }

@@ -4,3 +4,6 @@ qdrant-client>=1.9.0
 openai>=1.0.0
 pypdf>=4.0.0
 python-dotenv>=1.0.0
+sentence-transformers>=3.0.0
+# Optional: used for DashScope embedding backend
+dashscope>=1.0.0

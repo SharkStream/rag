@@ -24,7 +24,7 @@
 
 ## Next Tasks
 
-1. Add folder-level upload support for entire directories
+1. Completed: add folder-level upload support for entire directories
 2. Improve the document management interface in Gradio
 3. Improve PDF extraction quality for Chinese and complex layouts
 4. Add more robust error handling and retry logic for Qdrant/OpenAI calls

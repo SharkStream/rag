@@ -23,9 +23,30 @@ class QdrantService:
         self.client = QdrantClient(url=self.url, api_key=self.api_key or None)
 
     def ensure_collection(self) -> None:
-        """Ensure the Qdrant collection exists."""
+        """Ensure the Qdrant collection exists with the correct vector size."""
         collections = [item.name for item in self.client.get_collections().collections]
         if self.collection_name not in collections:
+            self.client.create_collection(
+                collection_name=self.collection_name,
+                vectors_config=models.VectorParams(
+                    size=self.vector_size,
+                    distance=models.Distance.COSINE,
+                ),
+            )
+            return
+
+        existing = self.client.get_collection(self.collection_name)
+        vectors_config = getattr(existing.config, "params", None)
+        if vectors_config is None:
+            return
+
+        existing_vectors = getattr(vectors_config, "vectors", None)
+        if existing_vectors is None:
+            return
+
+        existing_size = getattr(existing_vectors, "size", None)
+        if existing_size is not None and existing_size != self.vector_size:
+            self.client.delete_collection(self.collection_name)
             self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config=models.VectorParams(
@@ -54,16 +75,19 @@ class QdrantService:
             )
 
     def search(self, query_vector: list[float], limit: int = 5, score_threshold: float | None = None) -> list[dict[str, Any]]:
-        """Search for similar documents."""
-        results = self.client.search(
+        """Search for similar documents using the current Qdrant client API."""
+        response = self.client.query_points(
             collection_name=self.collection_name,
-            query_vector=query_vector,
+            query=query_vector,
             limit=limit,
             score_threshold=score_threshold,
+            with_payload=True,
+            with_vectors=False,
         )
+        points = getattr(response, "points", [])
         return [
             {"id": item.id, "score": item.score, "payload": item.payload}
-            for item in results
+            for item in points
         ]
 
     def list_documents(self, limit: int = 100, source: str | None = None) -> list[dict[str, Any]]:

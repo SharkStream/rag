@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template, request
 
 from config import settings
 from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
-from utils.document_loader import extract_text_from_file, index_text_to_qdrant
+from utils.document_loader import extract_text_from_file, index_directory_to_qdrant, index_text_to_qdrant
 
 
 llm_service = LLMService()
@@ -118,6 +118,23 @@ def create_app() -> Flask:
                 "message": "Files uploaded and indexed successfully.",
                 "files": indexed_files,
                 "chunks": total_chunks,
+            })
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.post("/api/upload-folder")
+    def upload_folder():
+        payload = request.get_json(silent=True) or {}
+        folder_path = payload.get("folder_path") or payload.get("path") or ""
+        if not folder_path:
+            return jsonify({"error": "Folder path is required."}), 400
+
+        try:
+            result = index_directory_to_qdrant(folder_path, llm_service=llm_service, qdrant_service=qdrant_service)
+            return jsonify({
+                "message": "Folder indexed successfully.",
+                "files": result["files"],
+                "chunks": result["chunks"],
             })
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500

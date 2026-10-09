@@ -1,5 +1,7 @@
 from __future__ import annotations
-
+import os
+os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
+os.environ["HF_HOME"] = r"D:\Tools\huggingface"  # 可选，指定缓存目录
 import gradio as gr
 
 from config import settings
@@ -17,7 +19,7 @@ def answer_question(question: str):
     if not question or not question.strip():
         return "Please enter a question.", {}
 
-    if not settings.OPENAI_API_KEY:
+    if settings.EMBEDDING_PROVIDER.lower() == "openai" and not settings.OPENAI_API_KEY:
         return "Please configure OPENAI_API_KEY first.", {}
 
     try:
@@ -52,7 +54,7 @@ def index_uploaded_files(file_obj):
     if file_obj is None:
         return "Please upload a file first.", "", []
 
-    if not settings.OPENAI_API_KEY:
+    if settings.EMBEDDING_PROVIDER.lower() == "openai" and not settings.OPENAI_API_KEY:
         return "Please configure OPENAI_API_KEY first.", "", []
 
     files = file_obj if isinstance(file_obj, list) else [file_obj]
@@ -95,6 +97,23 @@ def clear_knowledge_base():
         return f"Clear failed: {exc}"
 
 
+def index_folder_documents(folder_path: str):
+    """Index all supported files under a local folder path."""
+    if not folder_path or not folder_path.strip():
+        return "Please enter a valid folder path."
+
+    if settings.EMBEDDING_PROVIDER.lower() == "openai" and not settings.OPENAI_API_KEY:
+        return "Please configure OPENAI_API_KEY first."
+
+    try:
+        from utils.document_loader import index_directory_to_qdrant
+
+        result = index_directory_to_qdrant(folder_path.strip(), llm_service=llm_service, qdrant_service=qdrant_service)
+        return f"Indexed {result['chunks']} chunk(s) across {len(result['files'])} file(s)."
+    except Exception as exc:
+        return f"Folder indexing failed: {exc}"
+
+
 def delete_source_documents(source_name: str):
     """Delete all document chunks associated with the named source."""
     if not source_name or not source_name.strip():
@@ -121,6 +140,12 @@ def build_demo() -> gr.Blocks:
         indexed_files = gr.JSON(label="Indexed files")
 
         with gr.Row():
+            folder_path = gr.Textbox(label="Folder path", placeholder="e.g. D:/docs or /home/user/docs")
+            folder_btn = gr.Button("Index Folder", variant="primary")
+
+        folder_status = gr.Textbox(label="Folder status")
+
+        with gr.Row():
             source_name = gr.Textbox(label="Source name to delete", placeholder="e.g. doc1.txt")
             delete_btn = gr.Button("Delete Source", variant="stop")
 
@@ -139,6 +164,7 @@ def build_demo() -> gr.Blocks:
 
         upload_btn.click(fn=index_uploaded_files, inputs=uploaded_file, outputs=[upload_status, preview, indexed_files])
         clear_btn.click(fn=clear_knowledge_base, outputs=upload_status)
+        folder_btn.click(fn=index_folder_documents, inputs=folder_path, outputs=folder_status)
         delete_btn.click(fn=delete_source_documents, inputs=source_name, outputs=delete_status)
         submit_btn.click(fn=answer_question, inputs=question, outputs=[response, context_box])
         question.submit(fn=answer_question, inputs=question, outputs=[response, context_box])
