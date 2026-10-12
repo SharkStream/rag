@@ -48,21 +48,9 @@ def render_prompt(name: str, **kwargs: Any) -> str:
     if not rendered_values:
         rendered_values = {}
 
-    missing = [
-        field_name
-        for field_name in spec.required_fields
-        if field_name not in rendered_values or rendered_values[field_name] is None
-    ]
-    if missing:
-        raise ValueError(f"Prompt '{name}' is missing required fields: {missing}")
-
-    empty_values = [
-        field_name
-        for field_name in spec.required_fields
-        if isinstance(rendered_values.get(field_name), str) and not rendered_values[field_name].strip()
-    ]
-    if empty_values:
-        raise ValueError(f"Prompt '{name}' contains empty required fields: {empty_values}")
+    for field_name in spec.required_fields:
+        if field_name not in rendered_values:
+            rendered_values[field_name] = ""
 
     template = _get_env().get_template(spec.template_path)
     return template.render(**rendered_values)
