@@ -5,6 +5,7 @@ from typing import Iterable
 from openai import OpenAI
 
 from config import settings
+from prompts.service import PromptService
 from services.embeddings import (
     EmbeddingBackend,
     OpenAIEmbeddingBackend,
@@ -30,6 +31,7 @@ class LLMService:
             else None
         )
         self.embedding_backend = embedding_backend or self._build_embedding_backend()
+        self.prompt_service = PromptService()
 
     def _build_embedding_backend(self) -> EmbeddingBackend:
         provider = settings.EMBEDDING_PROVIDER.lower()
@@ -54,17 +56,69 @@ class LLMService:
         """Generate embeddings for a list of text chunks."""
         return self.embedding_backend.get_embeddings(texts)
 
-    def generate_answer(self, prompt: str, context: str = "") -> str:
-        """Generate a response using the configured LLM model."""
+    def _build_messages(
+        self,
+        prompt: str,
+        context: str = "",
+        language: str = "Chinese",
+        prompt_name: str | None = None,
+    ) -> list[dict[str, str]]:
+        """Build chat messages using the prompt template registry."""
+        system_prompt = self.prompt_service.render(
+            "chat.system",
+            system_role="You are a helpful assistant.",
+            language=language,
+        )
+
+        effective_prompt_name = prompt_name or (
+            "rag.answer_with_context" if context else "rag.answer_without_context"
+        )
+
+        if context:
+            user_prompt = self.prompt_service.render(
+                effective_prompt_name,
+                question=prompt,
+                context=context,
+                language=language,
+            )
+        else:
+            user_prompt = self.prompt_service.render(
+                effective_prompt_name,
+                question=prompt,
+                language=language,
+            )
+
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    def rewrite_query(self, question: str, language: str = "Chinese") -> str:
+        """Rewrite a user question using a dedicated prompt template."""
+        return self.prompt_service.render(
+            "rag.rewrite_query",
+            question=question,
+            language=language,
+        )
+
+    def generate_answer(
+        self,
+        prompt: str,
+        context: str = "",
+        *,
+        prompt_name: str | None = None,
+        language: str = "Chinese",
+    ) -> str:
+        """Generate a response using the configured LLM model and template-based prompts."""
         if self.client is None:
             raise ValueError("OPENAI_API_KEY is not configured.")
 
-        messages = [{"role": "system", "content": "You are a helpful assistant."}]
-
-        if context:
-            messages.append({"role": "user", "content": f"Context:\n{context}\n\nQuestion:\n{prompt}"})
-        else:
-            messages.append({"role": "user", "content": prompt})
+        messages = self._build_messages(
+            prompt=prompt,
+            context=context,
+            language=language,
+            prompt_name=prompt_name,
+        )
 
         response = self.client.chat.completions.create(
             model=self.llm_model,

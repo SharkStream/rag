@@ -1,0 +1,30 @@
+prompt_specs:
+  - name: chat.system
+    module: chat
+    path: chat/system.j2
+    required_fields: [system_role, language]
+    description: System instruction used for assistant responses.
+
+  - name: rag.answer_with_context
+    module: rag
+    path: rag/answer_with_context.j2
+    required_fields: [question, context, language]
+    description: Answer the user's question using retrieved context.
+
+  - name: rag.answer_without_context
+    module: rag
+    path: rag/answer_without_context.j2
+    required_fields: [question, language]
+    description: Answer the user's question without retrieved context.
+
+  - name: rag.rewrite_query
+    module: rag
+    path: rag/rewrite_query.j2
+    required_fields: [question, language]
+    description: Normalize the user question for retrieval.
+
+  - name: summary.summarize
+    module: summary
+    path: summary/summarize.j2
+    required_fields: [content, language]
+    description: Summarize a document or long content block.

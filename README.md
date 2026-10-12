@@ -24,6 +24,8 @@ The app is designed for local development and experimentation, while keeping a c
 - Generate answers using the configured LLM backend
 - Support local and cloud embedding providers
 - Use a React interface under `frontend/` with API proxying to Flask
+- Centralize prompt templates under a dedicated `prompts/` module for maintainability
+- Render prompt variables through a consistent template registry and renderer
 
 ## Project Structure
 
@@ -48,10 +50,21 @@ RAG/
 │   ├── src/
 │   ├── public/
 │   └── .env.example
+├── prompts/
+│   ├── __init__.py
+│   ├── registry.py               # Prompt registry and metadata
+│   ├── render.py                 # Jinja-based prompt rendering
+│   ├── templates/
+│   │   ├── chat/
+│   │   │   └── system.j2
+│   │   └── rag/
+│   │       ├── answer_with_context.j2
+│   │       ├── answer_without_context.j2
+│   │       └── rewrite_query.j2
 ├── services/
 │   ├── __init__.py
 │   ├── embeddings.py            # Embedding backend implementations
-│   ├── llm_service.py          # LLM and embedding orchestration
+│   ├── llm_service.py          # LLM orchestration + prompt rendering
 │   └── qdrant_service.py       # Qdrant collection / search logic
 ├── static/
 ├── templates/
@@ -131,6 +144,77 @@ VITE_API_BASE_URL=http://localhost:5000
 ```
 
 In the current setup, Vite is configured to proxy `/api` requests to the Flask backend, so the frontend usually just calls `/api/...` without needing a custom base URL.
+
+## Prompt Template Management
+
+The project now includes a dedicated `prompts/` module for managing large numbers of prompt templates in a maintainable way.
+
+### Why this is needed
+
+When a project grows, prompt strings often become scattered across Python code, which creates several issues:
+
+- prompt logic is hard to review and modify
+- variables are mixed into different functions
+- it becomes difficult to reuse or compare versions
+- prompt maintenance becomes fragile as the project scales
+
+### Current design
+
+The implementation is organized as follows:
+
+- `prompts/registry.py` stores prompt metadata and registration
+- `prompts/render.py` renders templates using variable injection
+- `prompts/templates/` stores the actual prompt text files
+- `services/llm_service.py` uses the prompt renderer instead of embedding raw prompt strings directly in code
+
+This gives a clean separation between business logic and prompt definition.
+
+### Example: using a template with variables
+
+Template file:
+
+```jinja2
+Use the following context:
+{{ context }}
+
+Question:
+{{ question }}
+
+Answer in {{ language }}.
+```
+
+Render code:
+
+```python
+from prompts.render import render_prompt
+
+prompt = render_prompt(
+    "rag.answer_with_context",
+    question="What is RAG?",
+    context="RAG combines retrieval and generation.",
+    language="English",
+)
+```
+
+### Best practices for large projects
+
+- Keep prompt files in dedicated folders by scenario, such as `rag/`, `chat/`, `summarize/`, and `classification/`
+- Register prompt names in a central registry
+- Use structured variables instead of ad hoc string concatenation
+- Validate required fields before rendering
+- Version prompts when changing behavior or evaluation strategy
+- Use a consistent language field for output control
+
+### Prompt versioning strategy
+
+For a growing project, versioning is recommended:
+
+- keep the prompt template in a file-based system
+- store template metadata in the registry
+- if needed, version files like `answer_v2.j2` or `answer_with_context.j2`
+- compare prompt behavior before and after changes during evaluation
+
+This makes the system extensible and predictable as the project grows.
 
 ## Requirements
 
@@ -250,6 +334,10 @@ The project is set to local embedding mode by default in development, so you can
 ### Legacy Gradio UI
 
 There is also a Gradio app in `gradio_app.py`, but the active modern UI lives in the React frontend under `frontend/`.
+
+### Prompt management is now centralized
+
+The prompt system is no longer embedded in the LLM service directly. Prompt files are managed under the `prompts/` module, and the rendering path is standardized, which is much easier to scale as the app grows.
 
 ## Troubleshooting
 

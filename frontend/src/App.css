@@ -1,18 +1,28 @@
 .app-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
   background: #f9fafb;
 }
 
 .sidebar {
   width: 340px;
+  height: 100vh;
+  min-height: 0;
+  flex-shrink: 0;
   background: #fff;
   border-right: 1px solid #e5e7eb;
-  padding: 20px 18px;
+  padding: 20px 18px 24px;
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  overscroll-behavior: contain;
   transition: width 0.2s ease, padding 0.2s ease;
+  position: sticky;
+  top: 0;
 }
 
 .sidebar.collapsed {
@@ -25,16 +35,58 @@
   display: none;
 }
 
+.sidebar.collapsed .sidebar-header {
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 0;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #f9fafb;
+}
+
+.sidebar-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #374151;
+}
+
+.section-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: #eef2ff;
+  font-size: 13px;
+}
+
 .sidebar-header {
   display: flex;
-  justify-content: space-between; 
-  align-items: center;     
-  width: 100%;             
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
   box-sizing: border-box;
-  padding: 0 16px;                
+  min-height: 32px;
 }
 
 .sidebar-header h2 {
+  flex: 0 0 auto;
   margin: 0;
   font-size: 18px;
   color: #111827;
@@ -49,15 +101,16 @@
   color: #374151;
   cursor: pointer;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
-.sidebar.collapsed .sidebar-header {
-  justify-content: center;
-  padding: 0;             
+.sidebar.collapsed .sidebar-toggle {
+  margin-left: 10px;
 }
 
 .upload-box,
 .folder-box,
+.prompt-box,
 .status-box {
   display: flex;
   flex-direction: column;
@@ -70,6 +123,7 @@
 
 .upload-box span,
 .folder-box label,
+.prompt-label,
 .status-box h3 {
   font-size: 12px;
   font-weight: 700;
@@ -79,13 +133,62 @@
 }
 
 .upload-box input,
-.folder-box input {
+.folder-box input,
+.prompt-box select {
   width: 100%;
   padding: 10px 12px;
   border: 1px solid #d1d5db;
   border-radius: 8px;
   background: #fff;
   color: #111827;
+  box-sizing: border-box;
+}
+
+.prompt-box {
+  gap: 8px;
+  background: linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+  border-color: #c7d2fe;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+.prompt-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.prompt-label::after {
+  content: 'template';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: #e0e7ff;
+  color: #3730a3;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.prompt-box select {
+  min-height: 46px;
+  font-weight: 600;
+  background: #fff;
+  color: #111827;
+}
+
+.prompt-description {
+  font-size: 11px;
+  line-height: 1.45;
+  color: #4b5563;
+  min-height: 16px;
+  background: rgba(255, 255, 255, 0.6);
+  border-left: 3px solid #8b5cf6;
+  border-radius: 6px;
+  padding: 7px 8px;
 }
 
 .primary-btn,
@@ -167,11 +270,16 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
+  height: 100vh;
+  overflow: hidden;
 }
 
 .messages-area {
   flex: 1;
-  overflow-y: auto; 
+  overflow-y: auto;
+  min-height: 0;
+  overscroll-behavior: contain;
   padding-bottom: 24px;
 }
 
@@ -321,13 +429,12 @@
   border-top: 1px solid #e5e7eb;
   background: rgba(255, 255, 255, 0.95);
   padding: 16px 24px;
-
-  position: sticky;   /* 或者使用 absolute，取决于你父级容器的控制 */
-  bottom: 0;          /* 固定在底部 */
+  position: sticky;
+  bottom: 0;
   left: 0;
-  width: 100%;        /* 宽度撑满父级聊天区域 */
-  box-sizing: border-box; /* 确保 padding 不会撑破宽度 */
-  z-index: 10; 
+  width: 100%;
+  box-sizing: border-box;
+  z-index: 10;
 }
 
 .chat-form {
@@ -373,6 +480,14 @@
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #e5e7eb;
+  }
+
+  .chat-form {
+    flex-direction: column;
+  }
+
+  .send-btn {
+    width: 100%;
   }
 
   .message-card {

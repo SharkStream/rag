@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, request
 
 from config import settings
+from prompts.registry import PROMPT_REGISTRY, resolve_prompt_name
 from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
 from utils.document_loader import extract_text_from_file, index_directory_to_qdrant, index_text_to_qdrant
@@ -12,38 +13,52 @@ llm_service = LLMService()
 qdrant_service = QdrantService()
 
 
-def build_context_from_hits(hits):
+def build_context_from_hits(hits, score_threshold: float | None = None):
     context_parts = []
     sources = []
+    threshold = settings.RETRIEVAL_SCORE_THRESHOLD if score_threshold is None else score_threshold
+
     for hit in hits:
         payload = hit.get("payload") or {}
         text = payload.get("text") or payload.get("content") or ""
-        if not text:
+        score = float(hit.get("score", 0) or 0)
+
+        if not text or score <= threshold:
             continue
+
         context_parts.append(text)
         sources.append(
             {
                 "id": hit.get("id"),
-                "score": round(float(hit.get("score", 0)), 4),
+                "score": round(score, 4),
                 "source": payload.get("source"),
             }
         )
     return "\n\n".join(context_parts), sources
 
 
-def query_rag(question: str):
+def query_rag(question: str, prompt_name: str | None = None):
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
 
     query_vector = llm_service.get_embeddings([question])[0]
     hits = qdrant_service.search(query_vector=query_vector, limit=5)
     context, sources = build_context_from_hits(hits)
+    has_context = bool(context)
+    chosen_prompt = resolve_prompt_name(prompt_name, has_context=has_context)
 
-    if not context:
-        answer = llm_service.generate_answer(question)
+    if not has_context:
+        answer = llm_service.generate_answer(
+            question,
+            prompt_name=chosen_prompt,
+        )
         return answer, [], "No relevant document found."
 
-    answer = llm_service.generate_answer(question, context=context)
+    answer = llm_service.generate_answer(
+        question,
+        context=context,
+        prompt_name=chosen_prompt,
+    )
     return answer, sources, context
 
 
@@ -61,6 +76,20 @@ def create_app() -> Flask:
     @app.get("/health")
     def health_check():
         return jsonify({"status": "healthy"})
+
+    @app.get("/api/prompts")
+    def list_available_prompts():
+        payload = [
+            {
+                "name": name,
+                "module": spec.module,
+                "description": spec.description,
+                "required_fields": list(spec.required_fields),
+                "template_path": spec.template_path,
+            }
+            for name, spec in sorted(PROMPT_REGISTRY.items())
+        ]
+        return jsonify({"prompts": payload})
 
     @app.post("/api/index")
     def index_documents():
@@ -176,15 +205,17 @@ def create_app() -> Flask:
     def query_documents():
         payload = request.get_json(silent=True) or {}
         question = payload.get("question") or payload.get("query") or ""
+        prompt_name = payload.get("prompt_name") or payload.get("prompt")
         if not question:
             return jsonify({"error": "Question is required."}), 400
 
         try:
-            answer, sources, context = query_rag(question)
+            answer, sources, context = query_rag(question, prompt_name=prompt_name)
             return jsonify({
                 "answer": answer,
                 "sources": sources,
                 "context": context,
+                "prompt_name": prompt_name,
             })
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500

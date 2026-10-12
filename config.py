@@ -19,14 +19,14 @@ def _normalize_env_name(name: str) -> str:
 
 
 def _load_environment_files() -> None:
-    local_env_file = BASE_DIR / ".env"
-    if local_env_file.exists():
-        load_dotenv(local_env_file, override=False)
-
     env_name = _normalize_env_name(APP_ENV)
     env_file = BASE_DIR / f".env.{env_name}"
     if env_file.exists():
-        load_dotenv(env_file, override=True)
+        load_dotenv(env_file, override=False)
+    
+    local_env_file = BASE_DIR / ".env"
+    if local_env_file.exists():
+        load_dotenv(local_env_file, override=True)
 
 
 _load_environment_files()
@@ -63,6 +63,7 @@ class Config:
 
     DEFAULT_CHUNK_SIZE = int(os.getenv("DEFAULT_CHUNK_SIZE", "500"))
     DEFAULT_CHUNK_OVERLAP = int(os.getenv("DEFAULT_CHUNK_OVERLAP", "50"))
+    RETRIEVAL_SCORE_THRESHOLD = float(os.getenv("RETRIEVAL_SCORE_THRESHOLD", "0.3"))
 
 
 settings = Config()

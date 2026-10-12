@@ -14,10 +14,17 @@ function App() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [fileInput, setFileInput] = useState(null)
   const [folderPath, setFolderPath] = useState('')
+  const [prompts, setPrompts] = useState([])
+  const [selectedPrompt, setSelectedPrompt] = useState('rag.answer_with_context')
 
   const formattedDocuments = useMemo(
     () => documents.filter(Boolean),
     [documents],
+  )
+
+  const selectedPromptMeta = useMemo(
+    () => prompts.find((prompt) => prompt.name === selectedPrompt) ?? null,
+    [prompts, selectedPrompt],
   )
 
   const fetchDocuments = async () => {
@@ -33,6 +40,29 @@ function App() {
 
   useEffect(() => {
     fetchDocuments()
+  }, [])
+
+  useEffect(() => {
+    const fetchPrompts = async () => {
+      try {
+        const response = await fetch('/api/prompts')
+        const data = await response.json()
+        const promptList = Array.isArray(data.prompts) ? data.prompts : []
+        setPrompts(promptList)
+
+        if (promptList.length > 0) {
+          const preferredPrompt =
+            promptList.find((prompt) => prompt.name === 'rag.answer_with_context') ??
+            promptList.find((prompt) => prompt.name.startsWith('rag.')) ??
+            promptList[0]
+          setSelectedPrompt(preferredPrompt.name)
+        }
+      } catch (error) {
+        setPrompts([])
+      }
+    }
+
+    fetchPrompts()
   }, [])
 
   const deleteDocument = async (sourceName) => {
@@ -153,7 +183,10 @@ function App() {
       const response = await fetch('/api/query', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: trimmed }),
+        body: JSON.stringify({
+          question: trimmed,
+          prompt_name: selectedPrompt,
+        }),
       })
       const data = await response.json()
 
@@ -194,64 +227,110 @@ function App() {
           </button>
         </div>
 
-        <label className="upload-box">
-          <span>Upload files</span>
-          <input
-            type="file"
-            multiple
-            onChange={(event) => setFileInput(event.target)}
-          />
-        </label>
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">
+            <span className="section-icon">⬆️</span>
+            <span>Upload</span>
+          </div>
 
-        <button type="button" className="primary-btn" onClick={handleUpload}>
-          Upload &amp; Index
-        </button>
+          <label className="upload-box">
+            <span>Upload files</span>
+            <input
+              type="file"
+              multiple
+              onChange={(event) => setFileInput(event.target)}
+            />
+          </label>
 
-        <div className="folder-box">
-          <label htmlFor="folderPath">Folder path</label>
-          <input
-            id="folderPath"
-            value={folderPath}
-            onChange={(event) => setFolderPath(event.target.value)}
-            placeholder="D:/docs or /home/user/docs"
-          />
-          <button type="button" className="secondary-btn" onClick={handleFolderIndex}>
-            Index Folder
+          <button type="button" className="primary-btn" onClick={handleUpload}>
+            Upload &amp; Index
           </button>
         </div>
 
-        <button type="button" className="danger-btn" onClick={handleClearCollection}>
-          Clear Collection
-        </button>
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">
+            <span className="section-icon">✨</span>
+            <span>Prompt</span>
+          </div>
 
-        <div className="status-box">
-          <h3>Status</h3>
-          <p>{status}</p>
+          <div className="prompt-box">
+            <label htmlFor="prompt-select" className="prompt-label">
+              Prompt
+            </label>
+            <select
+              id="prompt-select"
+              value={selectedPrompt}
+              onChange={(event) => setSelectedPrompt(event.target.value)}
+              disabled={prompts.length === 0}
+            >
+              {prompts.length === 0 ? (
+                <option value="">Loading prompts...</option>
+              ) : (
+                prompts.map((prompt) => (
+                  <option key={prompt.name} value={prompt.name}>
+                    {prompt.name}
+                  </option>
+                ))
+              )}
+            </select>
+            {selectedPromptMeta && (
+              <span className="prompt-description">{selectedPromptMeta.description}</span>
+            )}
+          </div>
         </div>
 
-        <div className="status-box">
-          <h3>Indexed sources</h3>
-          <ul className="doc-list">
-            {formattedDocuments.length === 0 ? (
-              <li>{emptyDocumentState}</li>
-            ) : (
-              formattedDocuments.map((item) => {
-                const sourceName = item.payload?.source || item.id || 'Unnamed source'
-                return (
-                  <li key={sourceName} className="doc-list-item">
-                    <span className="doc-label">{sourceName}</span>
-                    <button
-                      type="button"
-                      className="doc-delete-btn"
-                      onClick={() => deleteDocument(sourceName)}
-                    >
-                      Delete
-                    </button>
-                  </li>
-                )
-              })
-            )}
-          </ul>
+        <div className="sidebar-section">
+          <div className="sidebar-section-header">
+            <span className="section-icon">📚</span>
+            <span>Documents</span>
+          </div>
+
+          <div className="folder-box">
+            <label htmlFor="folderPath">Folder path</label>
+            <input
+              id="folderPath"
+              value={folderPath}
+              onChange={(event) => setFolderPath(event.target.value)}
+              placeholder="D:/docs or /home/user/docs"
+            />
+            <button type="button" className="secondary-btn" onClick={handleFolderIndex}>
+              Index Folder
+            </button>
+          </div>
+
+          <button type="button" className="danger-btn" onClick={handleClearCollection}>
+            Clear Collection
+          </button>
+
+          <div className="status-box">
+            <h3>Status</h3>
+            <p>{status}</p>
+          </div>
+
+          <div className="status-box">
+            <h3>Indexed sources</h3>
+            <ul className="doc-list">
+              {formattedDocuments.length === 0 ? (
+                <li>{emptyDocumentState}</li>
+              ) : (
+                formattedDocuments.map((item) => {
+                  const sourceName = item.payload?.source || item.id || 'Unnamed source'
+                  return (
+                    <li key={sourceName} className="doc-list-item">
+                      <span className="doc-label">{sourceName}</span>
+                      <button
+                        type="button"
+                        className="doc-delete-btn"
+                        onClick={() => deleteDocument(sourceName)}
+                      >
+                        Delete
+                      </button>
+                    </li>
+                  )
+                })
+              )}
+            </ul>
+          </div>
         </div>
       </aside>
 
@@ -308,7 +387,7 @@ function App() {
               onChange={(event) => setQuestion(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' && !event.shiftKey) {
-                  event.preventDefault(); 
+                  event.preventDefault();
 
                   if (question.trim() && !loading) {
                     handleSubmit(event);
