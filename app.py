@@ -219,6 +219,26 @@ def create_app() -> Flask:
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
+    @app.post("/api/chat/action")
+    def chat_action():
+        payload = request.get_json(silent=True) or {}
+        action = (payload.get("action") or "").strip().lower()
+        message_id = payload.get("message_id")
+
+        if not action:
+            return jsonify({"error": "Action is required."}), 400
+
+        supported_actions = {"like", "dislike"}
+        if action not in supported_actions:
+            return jsonify({"error": f"Unsupported action: {action}"}), 400
+
+        return jsonify({
+            "success": True,
+            "action": action,
+            "message_id": message_id,
+            "message": "Action recorded successfully.",
+        })
+
     return app
 
 

@@ -198,18 +198,121 @@ function App() {
       const sources = Array.isArray(data.sources) ? data.sources : []
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 1, type: 'assistant', content: answer, sources },
+        { id: Date.now() + 1, type: 'assistant', content: answer, sources, feedback: null },
       ])
       setStatus('Query finished.')
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { id: Date.now() + 2, type: 'assistant', content: `Error: ${error.message}` },
+        { id: Date.now() + 2, type: 'assistant', content: `Error: ${error.message}`, feedback: null },
       ])
       setStatus(error.message || 'Query failed.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleMessageAction = async (messageId, action, payload = {}) => {
+    try {
+      const response = await fetch('/api/chat/action', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, message_id: messageId, ...payload }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Action failed')
+      }
+
+      return true
+    } catch (error) {
+      setStatus(error.message || 'Action failed.')
+      return false
+    }
+  }
+
+  const handleCopyMessage = async (message) => {
+    try {
+      if (!navigator.clipboard || !message?.content) {
+        throw new Error('Unable to copy content.')
+      }
+
+      await navigator.clipboard.writeText(message.content)
+      setStatus('Copied response to clipboard.')
+    } catch (error) {
+      setStatus(error.message || 'Copy failed.')
+    }
+  }
+
+  const handleRegenerateMessage = async (messageId) => {
+    const targetIndex = messages.findIndex((message) => message.id === messageId)
+    if (targetIndex === -1) {
+      setStatus('Unable to find the response to regenerate.')
+      return
+    }
+
+    const previousUserMessage = [...messages]
+      .slice(0, targetIndex)
+      .reverse()
+      .find((message) => message.type === 'user')
+
+    if (!previousUserMessage?.content) {
+      setStatus('No valid question found to regenerate.')
+      return
+    }
+
+    setLoading(true)
+    setStatus('Regenerating response...')
+
+    try {
+      const response = await fetch('/api/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          question: previousUserMessage.content,
+          prompt_name: selectedPrompt,
+        }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Regenerate failed')
+      }
+
+      const answer = data.answer || 'No answer returned.'
+      const sources = Array.isArray(data.sources) ? data.sources : []
+
+      setMessages((prev) => prev.map((message) => (
+        message.id === messageId
+          ? { ...message, content: answer, sources, feedback: null }
+          : message
+      )))
+      setStatus('Regenerated response.')
+    } catch (error) {
+      setStatus(error.message || 'Regeneration failed.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleFeedback = async (messageId, nextFeedback) => {
+    const success = await handleMessageAction(messageId, nextFeedback === 'good' ? 'like' : 'dislike')
+    if (!success) {
+      return
+    }
+
+    setMessages((prev) => prev.map((message) => {
+      if (message.id !== messageId || message.type !== 'assistant') {
+        return message
+      }
+
+      const currentFeedback = message.feedback
+      const updatedFeedback = currentFeedback === nextFeedback ? null : nextFeedback
+      return { ...message, feedback: updatedFeedback }
+    }))
+
+    setStatus(nextFeedback === 'good' ? 'Response marked as helpful.' : 'Response marked as not helpful.')
   }
 
   return (
@@ -371,6 +474,52 @@ function App() {
                           <span>score: {Number(source.score || 0).toFixed(4)}</span>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {message.type === 'assistant' && (
+                    <div className="message-feedback" aria-label="Response actions">
+                      <button
+                        type="button"
+                        className="message-action-btn"
+                        data-tooltip="Copy response"
+                        onClick={() => handleCopyMessage(message)}
+                        aria-label="Copy response"
+                      >
+                        ⧉
+                      </button>
+
+                      <button
+                        type="button"
+                        className="message-action-btn"
+                        data-tooltip="Regenerate"
+                        onClick={() => handleRegenerateMessage(message.id)}
+                        aria-label="Regenerate response"
+                      >
+                        ↻
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`message-action-btn ${message.feedback === 'good' ? 'active good' : ''}`}
+                        data-tooltip="Good response"
+                        onClick={() => handleFeedback(message.id, 'good')}
+                        aria-label="Good response"
+                        aria-pressed={message.feedback === 'good'}
+                      >
+                        👍
+                      </button>
+
+                      <button
+                        type="button"
+                        className={`message-action-btn ${message.feedback === 'bad' ? 'active bad' : ''}`}
+                        data-tooltip="Bad response"
+                        onClick={() => handleFeedback(message.id, 'bad')}
+                        aria-label="Bad response"
+                        aria-pressed={message.feedback === 'bad'}
+                      >
+                        👎
+                      </button>
                     </div>
                   )}
                 </div>
