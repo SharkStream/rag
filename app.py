@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import logging
+
 from flask import Flask, jsonify, request
 
 from config import settings
@@ -7,10 +9,12 @@ from prompts.registry import PROMPT_REGISTRY, resolve_prompt_name
 from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
 from utils.document_loader import extract_text_from_file, index_directory_to_qdrant, index_text_to_qdrant
+from utils.log import configure_logging
 
 
 llm_service = LLMService()
 qdrant_service = QdrantService()
+logger = configure_logging()
 
 
 def build_context_from_hits(hits):
@@ -64,6 +68,13 @@ def query_rag(question: str, prompt_name: str | None = None):
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config.from_object(settings)
+    app.logger.handlers = logger.handlers
+    app.logger.setLevel(logging.DEBUG if settings.DEBUG else logging.INFO)
+
+    @app.before_request
+    def log_request_start():
+        if settings.DEBUG:
+            app.logger.debug("Incoming request: %s %s", request.method, request.path)
 
     @app.get("/")
     def index():
@@ -205,11 +216,15 @@ def create_app() -> Flask:
         payload = request.get_json(silent=True) or {}
         question = payload.get("question") or payload.get("query") or ""
         prompt_name = payload.get("prompt_name") or payload.get("prompt")
+        logger.info("Query request received: prompt=%s, question=%s", prompt_name, question[:200])
+
         if not question:
+            logger.warning("Empty question sent to /api/query")
             return jsonify({"error": "Question is required."}), 400
 
         try:
             answer, sources, context = query_rag(question, prompt_name=prompt_name)
+            logger.info("Query succeeded: prompt=%s, source_count=%s", prompt_name, len(sources))
             return jsonify({
                 "answer": answer,
                 "sources": sources,
@@ -217,6 +232,7 @@ def create_app() -> Flask:
                 "prompt_name": prompt_name,
             })
         except Exception as exc:
+            logger.exception("Query failed: prompt=%s, question=%s", prompt_name, question[:200])
             return jsonify({"error": str(exc)}), 500
 
     @app.post("/api/chat/action")
