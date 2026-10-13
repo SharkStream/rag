@@ -13,17 +13,16 @@ llm_service = LLMService()
 qdrant_service = QdrantService()
 
 
-def build_context_from_hits(hits, score_threshold: float | None = None):
+def build_context_from_hits(hits):
     context_parts = []
     sources = []
-    threshold = settings.RETRIEVAL_SCORE_THRESHOLD if score_threshold is None else score_threshold
 
     for hit in hits:
         payload = hit.get("payload") or {}
         text = payload.get("text") or payload.get("content") or ""
         score = float(hit.get("score", 0) or 0)
 
-        if not text or score <= threshold:
+        if not text:
             continue
 
         context_parts.append(text)
@@ -42,7 +41,7 @@ def query_rag(question: str, prompt_name: str | None = None):
         raise ValueError("Question cannot be empty.")
 
     query_vector = llm_service.get_embeddings([question])[0]
-    hits = qdrant_service.search(query_vector=query_vector, limit=5)
+    hits = qdrant_service.search(query_vector=query_vector, limit=5, score_threshold=settings.RETRIEVAL_SCORE_THRESHOLD)
     context, sources = build_context_from_hits(hits)
     has_context = bool(context)
     chosen_prompt = resolve_prompt_name(prompt_name, has_context=has_context)

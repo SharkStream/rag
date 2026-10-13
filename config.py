@@ -5,6 +5,27 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
 APP_ENV = os.getenv("APP_ENV", "development").strip().lower()
+VECTOR_DIM = {
+    "local": 384,
+    "sentence_transformers": 384,
+    "sentence-transformers": 384,
+    "dashscope": 1024,
+    "qwen": 1024,
+    "ali": 1024
+}
+PROVIDER_MAPPING = {
+    # DashScope Aliases
+    "dashscope": "dashscope", 
+    "qwen": "dashscope", 
+    "ali": "dashscope",
+    
+    # Local Aliases
+    "local": "local", 
+    "sentence_transformers": "local", 
+    "sentence-transformers": "local",
+}
+DEFAULT_EMBEDDING_PROVIDER = "openai"
+DEFAULT_VECTOR_DIM = 1536
 
 
 def _normalize_env_name(name: str) -> str:
@@ -33,20 +54,22 @@ _load_environment_files()
 
 
 def _default_vector_size() -> int:
-    provider = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
-    if provider in {"local", "sentence_transformers", "sentence-transformers"}:
-        return 384
-    return 1536
+    provider = os.getenv("EMBEDDING_PROVIDER", DEFAULT_EMBEDDING_PROVIDER).lower()
+    return VECTOR_DIM.get(provider, DEFAULT_VECTOR_DIM)
 
 
 class Config:
     APP_ENV = APP_ENV
     SECRET_KEY = os.getenv("SECRET_KEY", "change-me-in-production")
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
+    
+    PROVIDER_MAPPING = PROVIDER_MAPPING
+    DEFAULT_EMBEDDING_PROVIDER = DEFAULT_EMBEDDING_PROVIDER
+    DEFAULT_VECTOR_DIM = DEFAULT_VECTOR_DIM
 
     OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
     OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", "openai").lower()
+    EMBEDDING_PROVIDER = os.getenv("EMBEDDING_PROVIDER", DEFAULT_EMBEDDING_PROVIDER).lower()
     EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
     LLM_MODEL = os.getenv("LLM_MODEL", "local-model")
 

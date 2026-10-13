@@ -35,22 +35,29 @@ class LLMService:
 
     def _build_embedding_backend(self) -> EmbeddingBackend:
         provider = settings.EMBEDDING_PROVIDER.lower()
-        if provider in {"dashscope", "qwen", "ali"}:
-            return DashScopeEmbeddingBackend(
-                api_key=settings.DASHSCOPE_API_KEY,
-                model=self.embedding_model,
-            )
-        if provider in {"local", "sentence_transformers", "sentence-transformers"}:
-            return SentenceTransformersEmbeddingBackend(
-                model=settings.LOCAL_EMBEDDING_MODEL,
-                device=settings.LOCAL_EMBEDDING_DEVICE,
-            )
-
-        return OpenAIEmbeddingBackend(
-            api_key=self.api_key,
-            model=self.embedding_model,
-            base_url=settings.OPENAI_BASE_URL,
-        )
+        standard_provider = settings.PROVIDER_MAPPING.get(provider, settings.DEFAULT_EMBEDDING_PROVIDER)
+        match standard_provider:
+            # Case 1: DashScope group
+            case "dashscope":
+                return DashScopeEmbeddingBackend(
+                    api_key=settings.DASHSCOPE_API_KEY,
+                    model=settings.DASHSCOPE_EMBEDDING_MODEL,
+                )
+                
+            # Case 2: Local group
+            case "local":
+                return SentenceTransformersEmbeddingBackend(
+                    model=settings.LOCAL_EMBEDDING_MODEL,
+                    device=settings.LOCAL_EMBEDDING_DEVICE,
+                )
+                
+            # Case 3: Default fallback (OpenAI)
+            case _:
+                return OpenAIEmbeddingBackend(
+                    api_key=self.api_key,
+                    model=self.embedding_model,
+                    base_url=settings.OPENAI_BASE_URL,
+                )
 
     def get_embeddings(self, texts: Iterable[str]) -> list[list[float]]:
         """Generate embeddings for a list of text chunks."""
