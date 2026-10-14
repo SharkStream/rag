@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any
+from utils.logger import logger
 
 from config import settings
 
@@ -13,11 +14,12 @@ except Exception:  # pragma: no cover - optional dependency
 
 def _read_text_bytes(data: bytes, filename: str) -> str:
     suffix = Path(filename).suffix.lower()
-
+    logger.debug("Reading text from file '%s' with suffix '%s'", filename, suffix)
     if suffix in {".txt", ".md", ".csv", ".json", ".log"}:
         return data.decode("utf-8", errors="replace")
 
     if suffix == ".pdf" and PdfReader is not None:
+        logger.debug("Extracting text from PDF file '%s'", filename)
         text_parts: list[str] = []
         try:
             import io

@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+# Close system proxy
+import urllib.request
+urllib.request.getproxies = lambda: {}
+
 import logging
 
 from flask import Flask, jsonify, request
@@ -9,12 +13,12 @@ from prompts.registry import PROMPT_REGISTRY, resolve_prompt_name
 from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
 from utils.document_loader import extract_text_from_file, index_directory_to_qdrant, index_text_to_qdrant
-from utils.log import configure_logging
+from utils.logger import logger
 
 
 llm_service = LLMService()
 qdrant_service = QdrantService()
-logger = configure_logging()
+
 
 
 def build_context_from_hits(hits):
@@ -46,17 +50,21 @@ def query_rag(question: str, prompt_name: str | None = None):
 
     query_vector = llm_service.get_embeddings([question])[0]
     hits = qdrant_service.search(query_vector=query_vector, limit=5, score_threshold=settings.RETRIEVAL_SCORE_THRESHOLD)
+    logger.info("Retrieved %d hits for the question: %s", len(hits), question[:200])
     context, sources = build_context_from_hits(hits)
     has_context = bool(context)
     chosen_prompt = resolve_prompt_name(prompt_name, has_context=has_context)
-
+    logger.info("Using prompt '%s' for the query.", chosen_prompt)
+    logger.debug("Has context: %s", has_context)
     if not has_context:
+        logger.warning("No relevant documents found for the question: %s", question[:200])
         answer = llm_service.generate_answer(
             question,
             prompt_name=chosen_prompt,
         )
         return answer, [], "No relevant document found."
 
+    logger.debug("Context length: %d characters", len(context))
     answer = llm_service.generate_answer(
         question,
         context=context,
@@ -134,10 +142,12 @@ def create_app() -> Flask:
 
         try:
             for uploaded_file in uploaded_files:
+                logger.info("Processing uploaded file: %s", uploaded_file.filename)
                 if uploaded_file.filename == "":
                     continue
 
                 text = extract_text_from_file(uploaded_file, uploaded_file.filename)
+                logger.debug("Extracted text from file '%s': %d characters", uploaded_file.filename, len(text))
                 if not text.strip():
                     continue
 
@@ -147,6 +157,7 @@ def create_app() -> Flask:
                     llm_service=llm_service,
                     qdrant_service=qdrant_service,
                 )
+                logger.info("Indexed %d chunks from file '%s'", chunk_count, uploaded_file.filename)
                 indexed_files.append(uploaded_file.filename)
                 total_chunks += chunk_count
 
@@ -181,6 +192,8 @@ def create_app() -> Flask:
     @app.get("/api/documents")
     def list_documents():
         source = request.args.get("source")
+        if source is not None:
+            source = source.strip() or None
         try:
             return jsonify({"documents": qdrant_service.list_documents(source=source)})
         except Exception as exc:
@@ -207,6 +220,7 @@ def create_app() -> Flask:
     def clear_documents():
         try:
             qdrant_service.clear_collection()
+            logger.info("Knowledge base cleared successfully.")
             return jsonify({"message": "Knowledge base cleared successfully."})
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500

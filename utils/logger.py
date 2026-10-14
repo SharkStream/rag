@@ -10,10 +10,12 @@ def configure_logging() -> logging.Logger:
 
     logging.basicConfig(
         level=level,
-        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        format="%(asctime)s %(levelname)s %(name)s [%(filename)s:%(lineno)d]: %(message)s",
         handlers=[logging.StreamHandler()],
     )
 
     logger = logging.getLogger("rag_app")
     logger.setLevel(level)
     return logger
+
+logger = configure_logging()

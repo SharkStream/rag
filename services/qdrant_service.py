@@ -93,24 +93,29 @@ class QdrantService:
     def list_documents(self, limit: int = 100, source: str | None = None) -> list[dict[str, Any]]:
         """List stored documents with their payload metadata, optionally filtered by source."""
         self.ensure_collection()
+
+        normalized_source = source.strip() if isinstance(source, str) else source
         scroll_filter = None
-        if source:
+        if normalized_source:
             scroll_filter = models.Filter(
                 must=[
                     models.FieldCondition(
                         key="source",
-                        match=models.MatchValue(value=source),
+                        match=models.MatchValue(value=normalized_source),
                     )
                 ]
             )
 
-        response = self.client.scroll(
-            collection_name=self.collection_name,
-            limit=limit,
-            with_payload=True,
-            with_vectors=False,
-            filter=scroll_filter,
-        )
+        scroll_kwargs = {
+            "collection_name": self.collection_name,
+            "limit": limit,
+            "with_payload": True,
+            "with_vectors": False,
+        }
+        if scroll_filter is not None:
+            scroll_kwargs["filter"] = scroll_filter
+
+        response = self.client.scroll(**scroll_kwargs)
         points = response[0]
         return [
             {"id": point.id, "payload": point.payload}

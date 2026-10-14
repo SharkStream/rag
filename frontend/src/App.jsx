@@ -27,9 +27,10 @@ function App() {
     [prompts, selectedPrompt],
   )
 
-  const fetchDocuments = async () => {
+  const fetchDocuments = async (source = null) => {
     try {
-      const response = await fetch('/api/documents')
+      const query = source ? `?source=${encodeURIComponent(source)}` : ''
+      const response = await fetch(`/api/documents${query}`)
       const data = await response.json()
       setDocuments(Array.isArray(data.documents) ? data.documents : [])
     } catch (error) {
