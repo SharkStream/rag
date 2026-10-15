@@ -91,5 +91,8 @@ class Config:
     RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", "5"))
     RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
+    REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    REDIS_CACHE_TTL = int(os.getenv("REDIS_CACHE_TTL", "600"))
+
 
 settings = Config()

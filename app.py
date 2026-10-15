@@ -10,6 +10,7 @@ from flask import Flask, jsonify, request
 
 from config import settings
 from prompts.registry import PROMPT_REGISTRY, resolve_prompt_name
+from services.cache_service import RedisCache
 from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
 from services.rerank_service import RerankEngine
@@ -20,6 +21,7 @@ from utils.logger import logger
 llm_service = LLMService()
 qdrant_service = QdrantService()
 rerank_engine = RerankEngine()
+cache_service = RedisCache()
 
 
 def build_context_from_hits(hits):
@@ -50,19 +52,26 @@ def query_rag(question: str, prompt_name: str | None = None):
     if not question or not question.strip():
         raise ValueError("Question cannot be empty.")
 
-    query_vector = llm_service.get_embeddings([question])[0]
-    candidate_hits = qdrant_service.search(
-        query_vector=query_vector,
-        limit=settings.RETRIEVAL_LIMIT,
-        score_threshold=settings.RETRIEVAL_SCORE_THRESHOLD,
-    )
-    reranked_hits = rerank_engine.rerank(
-        question,
-        candidate_hits,
-        top_k=settings.RERANK_TOP_K,
-    )
-    logger.info("Retrieved %d candidate hits, reranked to %d for the question: %s", len(candidate_hits), len(reranked_hits), question[:200])
-    context, sources = build_context_from_hits(reranked_hits)
+    cached_hits = cache_service.get(question)
+    if cached_hits is not None:
+        logger.info("Using cached retrieval for query: %s", question[:200])
+        hits = cached_hits
+    else:
+        query_vector = llm_service.get_embeddings([question])[0]
+        candidate_hits = qdrant_service.search(
+            query_vector=query_vector,
+            limit=settings.RETRIEVAL_LIMIT,
+            score_threshold=settings.RETRIEVAL_SCORE_THRESHOLD,
+        )
+        hits = rerank_engine.rerank(
+            question,
+            candidate_hits,
+            top_k=settings.RERANK_TOP_K,
+        )
+        cache_service.set(question, hits)
+        logger.info("Retrieved %d candidate hits, reranked to %d for the question: %s", len(candidate_hits), len(hits), question[:200])
+
+    context, sources = build_context_from_hits(hits)
     has_context = bool(context)
     chosen_prompt = resolve_prompt_name(prompt_name, has_context=has_context)
     logger.info("Using prompt '%s' for the query.", chosen_prompt)
@@ -233,6 +242,14 @@ def create_app() -> Flask:
             qdrant_service.clear_collection()
             logger.info("Knowledge base cleared successfully.")
             return jsonify({"message": "Knowledge base cleared successfully."})
+        except Exception as exc:
+            return jsonify({"error": str(exc)}), 500
+
+    @app.post("/api/cache/clear")
+    def clear_cache():
+        try:
+            cache_service.clear()
+            return jsonify({"message": "Query cache cleared successfully."})
         except Exception as exc:
             return jsonify({"error": str(exc)}), 500
 
