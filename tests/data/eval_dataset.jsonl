@@ -1,0 +1,5 @@
+{"id":"q_001","query":"如何学习 Python？","ground_truth":{"positive":["doc1","doc3","doc5"],"negative":["doc2","doc4"]},"metadata":{"category":"编程教程","difficulty":"easy","annotator":"张三","created_at":"2026-10-15"}}
+{"id":"q_002","query":"Python 入门路线应该怎么安排？","ground_truth":{"positive":["doc1","doc3","doc6"],"negative":["doc7","doc9"]},"metadata":{"category":"编程教程","difficulty":"easy","annotator":"李四","created_at":"2026-10-15"}}
+{"id":"q_003","query":"机器学习的基础概念有哪些？","ground_truth":{"positive":["doc11","doc12","doc15"],"negative":["doc10","doc13"]},"metadata":{"category":"AI基础","difficulty":"medium","annotator":"王五","created_at":"2026-10-15"}}
+{"id":"q_004","query":"什么是过拟合，如何避免？","ground_truth":{"positive":["doc12","doc14","doc16"],"negative":["doc17","doc18"]},"metadata":{"category":"AI基础","difficulty":"medium","annotator":"赵六","created_at":"2026-10-15"}}
+{"id":"q_005","query":"RAG 系统中为什么需要重排？","ground_truth":{"positive":["doc20","doc21","doc22"],"negative":["doc19","doc23"]},"metadata":{"category":"RAG工程","difficulty":"hard","annotator":"孙七","created_at":"2026-10-15"}}

@@ -6,6 +6,7 @@ urllib.request.getproxies = lambda: {}
 
 import logging
 
+from asgiref.wsgi import WsgiToAsgi
 from flask import Flask, jsonify, request
 
 from config import settings
@@ -301,6 +302,7 @@ def create_app() -> Flask:
 
 
 app = create_app()
+asgi_app = WsgiToAsgi(app)
 
 
 if __name__ == "__main__":

@@ -237,7 +237,23 @@ cd D:\Projects\RAG
 D:\Projects\RAG\env\Scripts\python.exe -m pip install -r requirements.txt
 ```
 
-### 2) Start Qdrant
+### 2) Run the environment preflight check
+
+Before starting the app, validate that Redis, Qdrant, and the configured embedding backend are reachable.
+
+```bash
+cd D:\Projects\RAG
+invoke preflight
+```
+
+This runs the logic in `utils/preflight_check.py` and checks:
+
+- Redis connectivity via `REDIS_URL`
+- Qdrant reachability via `QDRANT_URL`
+- embedding provider configuration
+- whether required environment files are present
+
+### 3) Start Qdrant
 
 From the project root:
 
@@ -257,14 +273,31 @@ If you want to verify it:
 curl http://localhost:6333/collections
 ```
 
-### 3) Start the Flask backend
+### 4) Start the app with Invoke and uvicorn
+
+The project exposes a uvicorn-compatible ASGI adapter from `app.py`:
+
+```python
+from asgiref.wsgi import WsgiToAsgi
+
+app = create_app()
+asgi_app = WsgiToAsgi(app)
+```
+
+Then use the Invoke task:
 
 ```bash
 cd D:\Projects\RAG
-D:\Projects\RAG\env\Scripts\python.exe app.py
+invoke app
 ```
 
-The Flask API will run at:
+This runs:
+
+```bash
+uvicorn app:asgi_app --host 0.0.0.0 --port 5000
+```
+
+The API will be available at:
 
 ```text
 http://localhost:5000
@@ -276,7 +309,7 @@ Health check:
 http://localhost:5000/health
 ```
 
-### 4) Start the frontend
+### 5) Start the frontend
 
 ```bash
 cd D:\Projects\RAG\frontend
@@ -291,6 +324,19 @@ http://localhost:5173
 ```
 
 The frontend is configured to proxy `/api` traffic to the Flask backend automatically.
+
+## Invoke task shortcuts
+
+The project now supports a simple task-based workflow for local operations.
+
+```bash
+invoke preflight   # validate Redis / Qdrant / embedding environment
+invoke eval        # run the retrieval evaluation pipeline
+invoke app         # launch the app with uvicorn
+invoke serve       # alias for app
+```
+
+The evaluation script lives under `tests/eval.py` and reads the JSONL dataset in `tests/data/eval_dataset.jsonl`.
 
 ## Backend API
 
