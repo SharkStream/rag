@@ -87,6 +87,9 @@ class Config:
     DEFAULT_CHUNK_SIZE = int(os.getenv("DEFAULT_CHUNK_SIZE", "500"))
     DEFAULT_CHUNK_OVERLAP = int(os.getenv("DEFAULT_CHUNK_OVERLAP", "50"))
     RETRIEVAL_SCORE_THRESHOLD = float(os.getenv("RETRIEVAL_SCORE_THRESHOLD", "0.3"))
+    RETRIEVAL_LIMIT = int(os.getenv("RETRIEVAL_LIMIT", "20"))
+    RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", "5"))
+    RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
 
 
 settings = Config()

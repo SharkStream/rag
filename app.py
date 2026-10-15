@@ -12,13 +12,14 @@ from config import settings
 from prompts.registry import PROMPT_REGISTRY, resolve_prompt_name
 from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
+from services.rerank_service import RerankEngine
 from utils.document_loader import extract_text_from_file, index_directory_to_qdrant, index_text_to_qdrant
 from utils.logger import logger
 
 
 llm_service = LLMService()
 qdrant_service = QdrantService()
-
+rerank_engine = RerankEngine()
 
 
 def build_context_from_hits(hits):
@@ -28,7 +29,8 @@ def build_context_from_hits(hits):
     for hit in hits:
         payload = hit.get("payload") or {}
         text = payload.get("text") or payload.get("content") or ""
-        score = float(hit.get("score", 0) or 0)
+        score_value = hit.get("rerank_score", hit.get("score", 0) or 0)
+        score = float(score_value or 0)
 
         if not text:
             continue
@@ -49,9 +51,18 @@ def query_rag(question: str, prompt_name: str | None = None):
         raise ValueError("Question cannot be empty.")
 
     query_vector = llm_service.get_embeddings([question])[0]
-    hits = qdrant_service.search(query_vector=query_vector, limit=5, score_threshold=settings.RETRIEVAL_SCORE_THRESHOLD)
-    logger.info("Retrieved %d hits for the question: %s", len(hits), question[:200])
-    context, sources = build_context_from_hits(hits)
+    candidate_hits = qdrant_service.search(
+        query_vector=query_vector,
+        limit=settings.RETRIEVAL_LIMIT,
+        score_threshold=settings.RETRIEVAL_SCORE_THRESHOLD,
+    )
+    reranked_hits = rerank_engine.rerank(
+        question,
+        candidate_hits,
+        top_k=settings.RERANK_TOP_K,
+    )
+    logger.info("Retrieved %d candidate hits, reranked to %d for the question: %s", len(candidate_hits), len(reranked_hits), question[:200])
+    context, sources = build_context_from_hits(reranked_hits)
     has_context = bool(context)
     chosen_prompt = resolve_prompt_name(prompt_name, has_context=has_context)
     logger.info("Using prompt '%s' for the query.", chosen_prompt)
