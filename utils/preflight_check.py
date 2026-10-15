@@ -29,6 +29,14 @@ except Exception as exc:  # pragma: no cover
 else:
     QDRANT_IMPORT_ERROR = None
 
+try:
+    from dashscope import TextReRank
+except Exception as exc:  # pragma: no cover
+    TextReRank = None
+    DASHSCOPE_RERANK_IMPORT_ERROR = exc
+else:
+    DASHSCOPE_RERANK_IMPORT_ERROR = None
+
 
 def _print_section(title: str) -> None:
     print(f"\n=== {title} ===")
@@ -176,12 +184,60 @@ def check_embedding_config() -> bool:
     return ok
 
 
+def check_rerank_config() -> bool:
+    ok = True
+    _print_section("Rerank")
+
+    current_model = getattr(settings, "RERANK_MODEL", "")
+    is_dashscope = settings.RERANK_MODEL_MAPPING.get(current_model) == settings.RERANK_MODEL_TYPES.DASH_SCOPE
+
+    if not is_dashscope:
+        _report_ok("RERANK_MODEL", current_model or "not set")
+        return True
+
+    _report_ok("RERANK_MODEL", current_model)
+
+    if TextReRank is None:
+        _report_fail("dashscope TextReRank SDK", f"Import failed: {DASHSCOPE_RERANK_IMPORT_ERROR}")
+        return False
+
+    api_key = getattr(settings, "DASHSCOPE_API_KEY", "")
+    if not api_key:
+        _report_fail("DASHSCOPE_API_KEY", "missing")
+        return False
+
+    _report_ok("DASHSCOPE_API_KEY", "configured")
+
+    try:
+        response = TextReRank.call(
+            model=current_model,
+            query="test rerank connectivity",
+            documents=[
+                "This is a positive candidate document for rerank validation.",
+                "This is a different unrelated document.",
+            ],
+            top_n=2,
+            api_key=api_key,
+            return_documents=True,
+        )
+        if response.status_code == 200:
+            _report_ok("DashScope rerank", "model reachable and returned results")
+            return True
+
+        _report_fail("DashScope rerank", f"status_code={response.status_code}, code={getattr(response, 'code', 'unknown')}, message={getattr(response, 'message', 'unknown')}")
+        return False
+    except Exception as exc:
+        _report_fail("DashScope rerank", str(exc))
+        return False
+
+
 def main() -> int:
     checks = []
     checks.append(check_env_files())
     checks.append(check_redis())
     checks.append(check_qdrant())
     checks.append(check_embedding_config())
+    checks.append(check_rerank_config())
 
     failed = sum(1 for ok in checks if not ok)
     _print_section("Summary")

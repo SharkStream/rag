@@ -1,6 +1,6 @@
 import os
 from pathlib import Path
-
+from types import SimpleNamespace
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -23,6 +23,14 @@ PROVIDER_MAPPING = {
     "local": "local", 
     "sentence_transformers": "local", 
     "sentence-transformers": "local",
+}
+RERANK_MODEL_TYPES = SimpleNamespace(
+    DASH_SCOPE="dashscope",
+    CROSS_ENCODER="cross_encoder",
+)
+RERANK_MODEL_MAPPING = {
+    "qwen3.7-text-rerank": RERANK_MODEL_TYPES.DASH_SCOPE,
+    "cross-encoder/ms-marco-MiniLM-L-6-v2": RERANK_MODEL_TYPES.CROSS_ENCODER,
 }
 DEFAULT_EMBEDDING_PROVIDER = "openai"
 DEFAULT_VECTOR_DIM = 1536
@@ -75,6 +83,7 @@ class Config:
 
     DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY", "")
     DASHSCOPE_EMBEDDING_MODEL = os.getenv("DASHSCOPE_EMBEDDING_MODEL", "qwen3.7-text-embedding-flash")
+    DASHSCOPE_RERANK_MODEL = os.getenv("DASHSCOPE_RERANK_MODEL", "qwen3.7-text-rerank")
 
     LOCAL_EMBEDDING_MODEL = os.getenv("LOCAL_EMBEDDING_MODEL", "sentence-transformers/all-MiniLM-L6-v2")
     LOCAL_EMBEDDING_DEVICE = os.getenv("LOCAL_EMBEDDING_DEVICE", "cpu")
@@ -89,7 +98,9 @@ class Config:
     RETRIEVAL_SCORE_THRESHOLD = float(os.getenv("RETRIEVAL_SCORE_THRESHOLD", "0.3"))
     RETRIEVAL_LIMIT = int(os.getenv("RETRIEVAL_LIMIT", "20"))
     RERANK_TOP_K = int(os.getenv("RERANK_TOP_K", "5"))
-    RERANK_MODEL = os.getenv("RERANK_MODEL", "cross-encoder/ms-marco-MiniLM-L-6-v2")
+    RERANK_MODEL = os.getenv("RERANK_MODEL", "qwen3.7-text-rerank")
+    RERANK_MODEL_TYPES =  RERANK_MODEL_TYPES
+    RERANK_MODEL_MAPPING = RERANK_MODEL_MAPPING
 
     REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
     REDIS_CACHE_TTL = int(os.getenv("REDIS_CACHE_TTL", "600"))

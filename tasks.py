@@ -2,7 +2,7 @@ from invoke import task
 
 
 @task
-def preflight(c):
+def check(c):
     """Run environment preflight checks for Redis, Qdrant, and embedding config."""
     c.run("python -m utils.preflight_check")
 
@@ -23,3 +23,8 @@ def app(c, host="0.0.0.0", port=5000):
 def serve(c, host="0.0.0.0", port=5000):
     """Alias for app startup."""
     app(c, host=host, port=port)
+
+
+# if __name__ == "__main__":
+#     from tests.eval import main as eval_main
+#     eval_main()

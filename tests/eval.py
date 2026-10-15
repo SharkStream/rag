@@ -6,7 +6,7 @@ from services.llm_service import LLMService
 from services.qdrant_service import QdrantService
 from services.rerank_service import RerankEngine
 from config import settings
-from tests.eval_rag import evaluate_dataset, load_eval_dataset
+from tests.eval_rag_retrieve import evaluate_dataset, load_eval_dataset
 
 
 llm_service = LLMService()
@@ -30,15 +30,15 @@ def retrieve_docs_for_query(query: str, top_k: int = 5) -> list[str]:
     )
 
     return [
-        hit.get("id")
+        hit.get("payload").get("source")
         for hit in reranked_hits
-        if hit.get("id") is not None
+        if hit.get("payload") is not None
     ]
 
 
 def main() -> None:
     root = Path(__file__).resolve().parent
-    dataset_path = root / "tests" / "data" / "eval_dataset.jsonl"
+    dataset_path = root / "data" / "search" / "eval_dataset.jsonl"
     dataset = load_eval_dataset(dataset_path)
 
     retrieved_by_query = {}
